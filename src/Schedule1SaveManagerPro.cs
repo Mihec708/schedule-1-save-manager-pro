@@ -44,16 +44,17 @@ namespace Schedule1SaveManagerPro
             MelonLogger.Msg($"Save Manager loaded. Save root: {NormalizedSaveRoot()}");
         }
 
-        public override void OnUpdate()
-        {
-            if (ResolveToggleKey(out var key) && Input.GetKeyDown(key))
-            {
-                _showWindow = !_showWindow;
-            }
-        }
-
         public override void OnGUI()
         {
+            if (ResolveToggleKey(out var key)
+                && Event.current != null
+                && Event.current.type == EventType.KeyDown
+                && Event.current.keyCode == key)
+            {
+                _showWindow = !_showWindow;
+                Event.current.Use();
+            }
+
             if (!_showWindow)
             {
                 return;
