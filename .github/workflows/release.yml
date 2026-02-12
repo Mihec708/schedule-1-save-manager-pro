@@ -36,8 +36,14 @@ jobs:
           cp bin/Release/net6.0/Schedule1SaveManagerPro.dll dist/
 
       - name: Publish GitHub Release
+        # This logic ensures it runs on tags OR manual dispatch
         if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_release == 'true')
         uses: softprops/action-gh-release@v2
         with:
+          # If there is no git tag, it creates one based on the run number (e.g., v1.0.5)
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v1.0.{0}', github.run_number) }}
+          name: ${{ github.ref_type == 'tag' && github.ref_name || format('Release v1.0.{0}', github.run_number) }}
           files: dist/Schedule1SaveManagerPro.dll
           generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
