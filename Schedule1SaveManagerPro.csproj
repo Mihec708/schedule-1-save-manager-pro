@@ -8,30 +8,9 @@
     <ImplicitUsings>disable</ImplicitUsings>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <MelonLoaderDir Condition="'$(MELONLOADER_DIR)' == ''">$(MSBuildProjectDirectory)/lib/MelonLoader</MelonLoaderDir>
-  </PropertyGroup>
-
   <ItemGroup>
-    <Reference Include="MelonLoader">
-      <HintPath>$(MelonLoaderDir)/net6/MelonLoader.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="Il2Cppmscorlib">
-      <HintPath>$(MelonLoaderDir)/net6/Il2Cppmscorlib.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="UnityEngine">
-      <HintPath>$(MelonLoaderDir)/net6/UnityEngine.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="UnityEngine.CoreModule">
-      <HintPath>$(MelonLoaderDir)/net6/UnityEngine.CoreModule.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="UnityEngine.IMGUIModule">
-      <HintPath>$(MelonLoaderDir)/net6/UnityEngine.IMGUIModule.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
+    <PackageReference Include="LavaGang.MelonLoader" Version="0.7.1" />
+    <PackageReference Include="UnityEngine.CoreModule" Version="2020.3.1" />
+    <PackageReference Include="UnityEngine.IMGUIModule" Version="2020.3.1" />
   </ItemGroup>
 </Project>
