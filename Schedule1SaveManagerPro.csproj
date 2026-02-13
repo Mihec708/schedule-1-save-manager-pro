@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Schedule1SaveManagerPro</RootNamespace>
+    <AssemblyName>Schedule1SaveManagerPro</AssemblyName>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LavaGang.MelonLoader" Version="0.7.1" />
+    <PackageReference Include="UnityEngine.CoreModule" Version="2020.3.1" />
+    <PackageReference Include="UnityEngine.IMGUIModule" Version="2020.3.1" />
+  </ItemGroup>
+</Project>
