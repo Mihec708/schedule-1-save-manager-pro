@@ -20,9 +20,14 @@ namespace Schedule1SaveManagerPro
         private Vector2 _snapshotScroll;
         private string _newSnapshotName = string.Empty;
         private string _status = "Ready.";
+        private string _newWorldStatus = "Idle.";
 
         private string? _pendingRestoreSnapshotPath;
         private string? _pendingDeleteSnapshotPath;
+        private DateTime _worldCreateStartedAtUtc;
+        private string? _worldCreateBackupRoot;
+        private Dictionary<string, DateTime> _worldStateBeforeCreate = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+        private bool _watchWorldCreate;
 
         private MelonPreferences_Category _prefs = null!;
         private MelonPreferences_Entry<string> _saveRootPath = null!;
@@ -77,6 +82,7 @@ namespace Schedule1SaveManagerPro
 
             GUILayout.Space(8);
             GUILayout.Label($"Status: {_status}");
+            GUILayout.Label($"World Create: {_newWorldStatus}");
             GUILayout.Label($"Tip: {_toggleKey.Value} toggles this window.");
             GUILayout.EndVertical();
 
@@ -122,7 +128,21 @@ namespace Schedule1SaveManagerPro
             }
 
             GUILayout.EndHorizontal();
+
+            GUILayout.Space(6);
+            if (GUILayout.Button("New World (No Override)", GUILayout.Width(200)))
+            {
+                PrepareSafeNewWorldFlow();
+            }
             GUILayout.Space(10);
+        }
+
+        public override void OnUpdate()
+        {
+            if (_watchWorldCreate)
+            {
+                TryFinalizeSafeWorldCreate();
+            }
         }
 
         private void DrawSnapshotList()
@@ -413,6 +433,183 @@ namespace Schedule1SaveManagerPro
             }
 
             return $"{length:0.#} {sizes[order]}";
+        }
+
+        private void PrepareSafeNewWorldFlow()
+        {
+            try
+            {
+                EnsureDirectories();
+                var worldDirs = GetWorldDirectories();
+                _worldStateBeforeCreate = worldDirs.ToDictionary(path => Path.GetFileName(path), path => Directory.GetLastWriteTimeUtc(path), StringComparer.OrdinalIgnoreCase);
+
+                _worldCreateBackupRoot = Path.Combine(SnapshotsRoot, $"PreCreateWorlds-{DateTime.Now:yyyyMMdd-HHmmss}");
+                Directory.CreateDirectory(_worldCreateBackupRoot);
+                foreach (var dir in worldDirs)
+                {
+                    CopyDirectory(dir, Path.Combine(_worldCreateBackupRoot, Path.GetFileName(dir)));
+                }
+
+                _watchWorldCreate = true;
+                _worldCreateStartedAtUtc = DateTime.UtcNow;
+                _newWorldStatus = "Prepared backup; open New World screen now.";
+
+                if (!TryOpenWorldCreationScreen())
+                {
+                    _newWorldStatus = "Prepared backup. Could not auto-open menu, click New World manually.";
+                }
+            }
+            catch (Exception ex)
+            {
+                _newWorldStatus = $"Prepare failed: {ex.Message}";
+                MelonLogger.Error(ex.ToString());
+            }
+        }
+
+        private void TryFinalizeSafeWorldCreate()
+        {
+            try
+            {
+                var worldDirs = GetWorldDirectories();
+                if (worldDirs.Count == 0)
+                {
+                    return;
+                }
+
+                var newWorldFound = worldDirs.Any(path => !_worldStateBeforeCreate.ContainsKey(Path.GetFileName(path)));
+                if (newWorldFound)
+                {
+                    _watchWorldCreate = false;
+                    _newWorldStatus = "New world created as additional slot.";
+                    return;
+                }
+
+                if ((DateTime.UtcNow - _worldCreateStartedAtUtc).TotalSeconds < 2)
+                {
+                    return;
+                }
+
+                var changed = worldDirs
+                    .Select(path => new { Path = path, Name = Path.GetFileName(path), Time = Directory.GetLastWriteTimeUtc(path) })
+                    .Where(x => _worldStateBeforeCreate.TryGetValue(x.Name, out var before) && x.Time > before.AddSeconds(1))
+                    .OrderByDescending(x => x.Time)
+                    .FirstOrDefault();
+
+                if (changed == null || string.IsNullOrWhiteSpace(_worldCreateBackupRoot))
+                {
+                    return;
+                }
+
+                var nextName = GetNextWorldName(worldDirs.Select(Path.GetFileName));
+                var nextPath = Path.Combine(NormalizedSaveRoot(), nextName);
+                CopyDirectory(changed.Path, nextPath);
+
+                var backupOriginal = Path.Combine(_worldCreateBackupRoot, changed.Name);
+                if (Directory.Exists(backupOriginal))
+                {
+                    Directory.Delete(changed.Path, true);
+                    CopyDirectory(backupOriginal, changed.Path);
+                }
+
+                _watchWorldCreate = false;
+                _newWorldStatus = $"Moved new world to '{nextName}' and restored '{changed.Name}'.";
+            }
+            catch (Exception ex)
+            {
+                _watchWorldCreate = false;
+                _newWorldStatus = $"Finalize failed: {ex.Message}";
+                MelonLogger.Error(ex.ToString());
+            }
+        }
+
+        private List<string> GetWorldDirectories()
+        {
+            return Directory.GetDirectories(NormalizedSaveRoot())
+                .Where(path =>
+                {
+                    var name = Path.GetFileName(path);
+                    if (name.Equals("Snapshots", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return false;
+                    }
+
+                    return name.IndexOf("world", StringComparison.OrdinalIgnoreCase) >= 0;
+                })
+                .ToList();
+        }
+
+        private static string GetNextWorldName(IEnumerable<string> existingNames)
+        {
+            var used = new HashSet<int>();
+            foreach (var name in existingNames)
+            {
+                var digits = new string(name.Where(char.IsDigit).ToArray());
+                if (int.TryParse(digits, out var n))
+                {
+                    used.Add(n);
+                }
+            }
+
+            var next = 1;
+            while (used.Contains(next))
+            {
+                next++;
+            }
+
+            return $"World{next}";
+        }
+
+        private bool TryOpenWorldCreationScreen()
+        {
+            var candidates = new[]
+            {
+                "OpenWorldCreation",
+                "OpenCreateWorld",
+                "OpenNewWorld",
+                "OnClickNewWorld",
+                "NewGame"
+            };
+
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type[] types;
+                try
+                {
+                    types = assembly.GetTypes();
+                }
+                catch
+                {
+                    continue;
+                }
+
+                foreach (var type in types)
+                {
+                    foreach (var methodName in candidates)
+                    {
+                        var method = type.GetMethod(methodName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic, null, Type.EmptyTypes, null);
+                        if (method == null)
+                        {
+                            continue;
+                        }
+
+                        var instances = UnityEngine.Object.FindObjectsOfType(type);
+                        foreach (var instance in instances)
+                        {
+                            try
+                            {
+                                method.Invoke(instance, null);
+                                return true;
+                            }
+                            catch
+                            {
+                                // keep trying candidates
+                            }
+                        }
+                    }
+                }
+            }
+
+            return false;
         }
     }
 }
