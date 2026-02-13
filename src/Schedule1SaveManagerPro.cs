@@ -66,10 +66,13 @@ namespace Schedule1SaveManagerPro
             }
 
             GUI.backgroundColor = new Color(0.12f, 0.12f, 0.12f, 0.92f);
-            _windowRect = GUI.Window(99127, _windowRect, DrawWindow, "Schedule 1 Save Manager Pro v1.0.0");
+            GUI.Box(_windowRect, "Schedule 1 Save Manager Pro v1.0.0");
+            GUILayout.BeginArea(new Rect(_windowRect.x + 8, _windowRect.y + 24, _windowRect.width - 16, _windowRect.height - 32));
+            DrawWindow();
+            GUILayout.EndArea();
         }
 
-        private void DrawWindow(int _)
+        private void DrawWindow()
         {
             GUILayout.BeginVertical();
             GUILayout.Label("MelonLoader save tools: unlimited snapshots + restore + delete");
@@ -86,7 +89,6 @@ namespace Schedule1SaveManagerPro
             GUILayout.Label($"Tip: {_toggleKey.Value} toggles this window.");
             GUILayout.EndVertical();
 
-            GUI.DragWindow(new Rect(0, 0, 10000, 20));
         }
 
         private void DrawPathControls()
