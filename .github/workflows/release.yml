@@ -4,10 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       publish_release:
-        description: "Publish a GitHub Release asset (requires a tag ref)."
+        description: "Publish a GitHub Release asset"
         required: false
         default: false
         type: boolean
+      release_tag:
+        description: "Tag name for manual release (example: v1.0.0)"
+        required: false
+        type: string
   push:
     branches:
       - '**'
@@ -35,9 +39,25 @@ jobs:
           mkdir -p dist
           cp bin/Release/net6.0/Schedule1SaveManagerPro.dll dist/
 
-      - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_release == 'true')
+      - name: Validate release tag for manual publish
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_release == 'true'
+        run: |
+          if [ -z "${{ github.event.inputs.release_tag }}" ]; then
+            echo "release_tag is required when publish_release=true"
+            exit 1
+          fi
+
+      - name: Publish GitHub Release (tag push)
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          files: dist/Schedule1SaveManagerPro.dll
+          generate_release_notes: true
+
+      - name: Publish GitHub Release (manual)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
           files: dist/Schedule1SaveManagerPro.dll
           generate_release_notes: true
